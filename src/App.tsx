@@ -12,15 +12,25 @@ export default function App() {
   const [targetSlug, setTargetSlug] = useState('verde-botanica');
   const [targetTableId, setTargetTableId] = useState('tbl-verde-01');
 
-  // Parse path on initial load if user navigated with QR deep link
+  // Parse path on initial load and handle browser back/forward navigation
   useEffect(() => {
-    const pathname = window.location.pathname;
-    const match = pathname.match(/\/restaurant\/([^/]+)\/table\/([^/]+)/);
-    if (match) {
-      setTargetSlug(match[1]);
-      setTargetTableId(match[2]);
-      setCurrentView('customer');
-    }
+    const handleLocationChange = () => {
+      const pathname = window.location.pathname;
+      const match = pathname.match(/\/restaurant\/([^/]+)\/table\/([^/]+)/);
+      if (match) {
+        setTargetSlug(match[1]);
+        setTargetTableId(match[2]);
+        setCurrentView('customer');
+      } else if (pathname === '/admin') {
+        setCurrentView('admin');
+      } else {
+        setCurrentView('launcher');
+      }
+    };
+
+    handleLocationChange();
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
   const handleLaunchCustomer = (slug: string, tableId: string) => {

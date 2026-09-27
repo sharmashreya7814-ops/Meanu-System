@@ -106,7 +106,10 @@ export const OrderStatusView: React.FC<OrderStatusViewProps> = ({
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center space-y-3">
-          <RefreshCw className="w-8 h-8 animate-spin text-emerald-600 mx-auto" />
+          <RefreshCw
+            className="w-8 h-8 animate-spin mx-auto"
+            style={{ color: theme.colors.primary }}
+          />
           <p className="text-xs text-slate-500 font-mono">Loading live order status...</p>
         </div>
       </div>
@@ -214,15 +217,21 @@ export const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           <div
             className="p-3 rounded-xl border flex items-center justify-between text-xs"
             style={{
-              backgroundColor: isDark ? '#0f172a' : '#ecfdf5',
-              borderColor: isDark ? theme.colors.border : '#a7f3d0',
-              color: isDark ? '#6ee7b7' : '#047857',
+              backgroundColor: isDark ? 'rgba(234, 88, 12, 0.12)' : '#ecfdf5',
+              borderColor: isDark ? 'rgba(234, 88, 12, 0.35)' : '#a7f3d0',
+              color: isDark ? '#fb923c' : '#047857',
             }}
           >
             <div className="flex items-center gap-2">
               <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                <span
+                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                  style={{ backgroundColor: theme.colors.primaryLight }}
+                ></span>
+                <span
+                  className="relative inline-flex rounded-full h-2.5 w-2.5"
+                  style={{ backgroundColor: theme.colors.primary }}
+                ></span>
               </span>
               <span className="font-semibold">
                 Status: {order.status.replace(/_/g, ' ')}
@@ -262,9 +271,13 @@ export const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-all ${
                       isCurrent
-                        ? 'bg-emerald-600 border-emerald-400 text-white shadow-md scale-110'
+                        ? isDark
+                          ? 'bg-orange-600 border-orange-400 text-white shadow-md shadow-orange-950/50 scale-110'
+                          : 'bg-emerald-600 border-emerald-400 text-white shadow-md shadow-emerald-950/20 scale-110'
                         : isPast
-                        ? 'bg-emerald-100 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                        ? isDark
+                          ? 'bg-orange-950/60 border-orange-600 text-orange-400'
+                          : 'bg-emerald-100 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400'
                         : isDark
                         ? 'bg-slate-900 border-slate-700 text-slate-500'
                         : 'bg-white border-slate-200 text-slate-400'
@@ -278,7 +291,9 @@ export const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                       <h4
                         className={`text-xs font-semibold ${
                           isCurrent
-                            ? 'text-emerald-600 dark:text-emerald-400'
+                            ? isDark
+                              ? 'text-orange-400 font-bold'
+                              : 'text-emerald-600 dark:text-emerald-400 font-bold'
                             : isPast
                             ? 'text-slate-800 dark:text-slate-200'
                             : 'text-slate-400'
@@ -287,7 +302,11 @@ export const OrderStatusView: React.FC<OrderStatusViewProps> = ({
                         {step.label}
                       </h4>
                       {isCurrent && (
-                        <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
+                        <span
+                          className={`text-[10px] uppercase font-bold tracking-wider ${
+                            isDark ? 'text-orange-400' : 'text-emerald-600 dark:text-emerald-400'
+                          }`}
+                        >
                           Current Stage
                         </span>
                       )}
@@ -346,7 +365,12 @@ export const OrderStatusView: React.FC<OrderStatusViewProps> = ({
           className={`w-full py-2.5 px-4 text-xs font-semibold cursor-pointer ${getButtonClasses('secondary')}`}
         >
           {callAssistanceSent ? (
-            <span className="text-emerald-600 font-semibold">✓ Table Service Notified</span>
+            <span
+              className="font-semibold"
+              style={{ color: isDark ? '#fb923c' : '#059669' }}
+            >
+              ✓ Table Service Notified
+            </span>
           ) : (
             <span>🔔 Need Assistance / Call Staff</span>
           )}

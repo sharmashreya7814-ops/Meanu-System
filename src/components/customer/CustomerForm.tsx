@@ -186,7 +186,10 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onSuccess, onBack })
             color: theme.colors.textMuted,
           }}
         >
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <ShieldCheck
+            className="w-3.5 h-3.5"
+            style={{ color: isDark ? theme.colors.accent : theme.colors.primary }}
+          />
           <span>No passwords or account registration required</span>
         </div>
       </motion.div>

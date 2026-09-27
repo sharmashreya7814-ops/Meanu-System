@@ -104,7 +104,10 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
         <div className="text-center space-y-3">
-          <RefreshCw className="w-8 h-8 animate-spin text-emerald-500 mx-auto" />
+          <RefreshCw
+            className="w-8 h-8 animate-spin mx-auto"
+            style={{ color: theme.colors.primary }}
+          />
           <p className="text-xs font-mono text-slate-400">
             Identifying table QR session...
           </p>
@@ -234,9 +237,17 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
               {activeOrderNumber && (
                 <button
                   onClick={() => setStep('order_status')}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs border ${
+                    isDark
+                      ? 'bg-orange-950/60 text-orange-300 border-orange-800/80 hover:bg-orange-950'
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+                  }`}
                 >
-                  <Clock className="w-3.5 h-3.5 animate-pulse text-emerald-600 dark:text-emerald-400" />
+                  <Clock
+                    className={`w-3.5 h-3.5 animate-pulse ${
+                      isDark ? 'text-orange-400' : 'text-emerald-600'
+                    }`}
+                  />
                   <span>Track Order</span>
                 </button>
               )}

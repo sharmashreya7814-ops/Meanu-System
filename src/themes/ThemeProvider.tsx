@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ThemeConfig, ThemePreset } from '../types/index.js';
 import { NON_VEG_THEME, THEME_PRESETS, VEG_THEME } from './themeConfig.js';
+import { useRestaurant } from '../context/RestaurantContext.js';
 
 interface ThemeContextType {
   theme: ThemeConfig;
@@ -10,6 +11,8 @@ interface ThemeContextType {
   getCardClasses: (extra?: string) => string;
   getButtonClasses: (variant?: 'primary' | 'secondary' | 'outline' | 'ghost') => string;
   getInputClasses: () => string;
+  isManualOverride: boolean;
+  resetToRestaurantTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -18,19 +21,42 @@ export const ThemeProvider: React.FC<{
   initialTheme?: ThemeConfig;
   children: React.ReactNode;
 }> = ({ initialTheme = VEG_THEME, children }) => {
+  const { restaurant } = useRestaurant();
   const [theme, setTheme] = useState<ThemeConfig>(initialTheme);
+  const [isManualOverride, setIsManualOverride] = useState(false);
 
-  // Sync with initialTheme prop if changed externally
+  // Synchronize theme with the resolved restaurant's configuration as the single source of truth
   useEffect(() => {
-    if (initialTheme) {
-      setTheme(initialTheme);
+    if (restaurant) {
+      const presetKey = restaurant.themePreset;
+      if (presetKey && THEME_PRESETS[presetKey]) {
+        setTheme(THEME_PRESETS[presetKey]);
+      } else if (restaurant.themeConfig) {
+        setTheme(restaurant.themeConfig);
+      } else {
+        setTheme(VEG_THEME);
+      }
+      setIsManualOverride(false);
     }
-  }, [initialTheme]);
+  }, [restaurant?.id, restaurant?.themePreset, restaurant?.themeConfig]);
 
   const setThemePreset = (preset: ThemePreset) => {
     if (THEME_PRESETS[preset]) {
       setTheme(THEME_PRESETS[preset]);
+      setIsManualOverride(true);
     }
+  };
+
+  const resetToRestaurantTheme = () => {
+    if (restaurant) {
+      const presetKey = restaurant.themePreset;
+      if (presetKey && THEME_PRESETS[presetKey]) {
+        setTheme(THEME_PRESETS[presetKey]);
+      } else if (restaurant.themeConfig) {
+        setTheme(restaurant.themeConfig);
+      }
+    }
+    setIsManualOverride(false);
   };
 
   const isDark = theme.preset === 'NON_VEG_THEME';
@@ -112,8 +138,10 @@ export const ThemeProvider: React.FC<{
       getCardClasses,
       getButtonClasses,
       getInputClasses,
+      isManualOverride,
+      resetToRestaurantTheme,
     }),
-    [theme, isDark],
+    [theme, isDark, isManualOverride],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

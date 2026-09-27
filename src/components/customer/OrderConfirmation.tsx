@@ -33,12 +33,19 @@ export const OrderConfirmation: React.FC<OrderConfirmationProps> = ({
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', delay: 0.1, stiffness: 300, damping: 18 }}
-          className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center mb-4 shadow-sm"
+          className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 shadow-sm ${
+            isDark
+              ? 'bg-orange-950/70 border border-orange-500/40 text-orange-400'
+              : 'bg-emerald-100 text-emerald-600'
+          }`}
         >
           <CheckCircle2 className="w-10 h-10" />
         </motion.div>
 
-        <span className="text-xs font-mono font-bold tracking-wider text-emerald-600 dark:text-emerald-400 uppercase">
+        <span
+          className="text-xs font-mono font-bold tracking-wider uppercase"
+          style={{ color: theme.colors.primary }}
+        >
           Order Sent to Kitchen
         </span>
 
