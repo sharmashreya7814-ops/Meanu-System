@@ -20,6 +20,7 @@ import { useRestaurant } from '../../context/RestaurantContext.js';
 interface OrderStatusViewProps {
   orderNumber: string;
   onBackToMenu: () => void;
+  onViewDigitalBill?: (orderNumber: string) => void;
 }
 
 const STATUS_STEPS: Array<{
@@ -63,6 +64,7 @@ const STATUS_STEPS: Array<{
 export const OrderStatusView: React.FC<OrderStatusViewProps> = ({
   orderNumber,
   onBackToMenu,
+  onViewDigitalBill,
 }) => {
   const { restaurant } = useRestaurant();
   const { theme, getButtonClasses, getCardClasses, isDark } = useTheme();
@@ -360,6 +362,20 @@ export const OrderStatusView: React.FC<OrderStatusViewProps> = ({
 
       {/* Table Service Call & Order More CTAs */}
       <div className="space-y-2">
+        {order.status === 'COMPLETED' && onViewDigitalBill && (
+          <motion.button
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={() => onViewDigitalBill(order.orderNumber)}
+            className={`w-full py-3.5 px-4 text-xs font-bold flex items-center justify-center gap-2 rounded-xl cursor-pointer shadow-lg ${getButtonClasses(
+              'primary',
+            )}`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>View Digital Bill & Settle Payment</span>
+          </motion.button>
+        )}
+
         <button
           onClick={handleCallWaiter}
           className={`w-full py-2.5 px-4 text-xs font-semibold cursor-pointer ${getButtonClasses('secondary')}`}

@@ -11,15 +11,24 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'launcher' | 'customer' | 'admin'>('launcher');
   const [targetSlug, setTargetSlug] = useState('verde-botanica');
   const [targetTableId, setTargetTableId] = useState('tbl-verde-01');
+  const [targetBillNumber, setTargetBillNumber] = useState<string | undefined>(undefined);
 
   // Parse path on initial load and handle browser back/forward navigation
   useEffect(() => {
     const handleLocationChange = () => {
       const pathname = window.location.pathname;
-      const match = pathname.match(/\/restaurant\/([^/]+)\/table\/([^/]+)/);
-      if (match) {
-        setTargetSlug(match[1]);
-        setTargetTableId(match[2]);
+      const tableMatch = pathname.match(/\/restaurant\/([^/]+)\/table\/([^/]+)/);
+      const billMatch = pathname.match(/\/restaurant\/([^/]+)\/bill\/([^/]+)/);
+
+      if (tableMatch) {
+        setTargetSlug(tableMatch[1]);
+        setTargetTableId(tableMatch[2]);
+        setTargetBillNumber(undefined);
+        setCurrentView('customer');
+      } else if (billMatch) {
+        setTargetSlug(billMatch[1]);
+        setTargetBillNumber(billMatch[2]);
+        setTargetTableId('tbl-01');
         setCurrentView('customer');
       } else if (pathname === '/admin') {
         setCurrentView('admin');
@@ -36,6 +45,7 @@ export default function App() {
   const handleLaunchCustomer = (slug: string, tableId: string) => {
     setTargetSlug(slug);
     setTargetTableId(tableId);
+    setTargetBillNumber(undefined);
     setCurrentView('customer');
     // Update browser URL without reloading
     window.history.pushState({}, '', `/restaurant/${slug}/table/${tableId}`);
@@ -109,6 +119,7 @@ export default function App() {
               <CustomerApp
                 restaurantSlug={targetSlug}
                 tableId={targetTableId}
+                initialBillNumber={targetBillNumber}
                 onSwitchToAdmin={handleLaunchAdmin}
               />
             )}

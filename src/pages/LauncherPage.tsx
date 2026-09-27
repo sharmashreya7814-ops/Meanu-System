@@ -36,7 +36,7 @@ export const LauncherPage: React.FC<LauncherPageProps> = ({
 
         const tblMap: Record<string, Table[]> = {};
         for (const r of rests) {
-          const tList = await api.getAdminTables(r.id);
+          const tList = await api.getRestaurantTables(r.slug).catch(() => []);
           tblMap[r.id] = tList;
         }
         setTablesMap(tblMap);

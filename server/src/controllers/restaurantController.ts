@@ -107,3 +107,25 @@ export async function createCustomerSession(req: Request, res: Response, next: N
     next(error);
   }
 }
+
+export async function getRestaurantTables(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { slug } = req.params;
+    const restaurant = await repository.getRestaurantBySlug(slug);
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Restaurant not found.',
+      });
+    }
+
+    const tables = await repository.getTablesByRestaurant(restaurant.id);
+    res.json({
+      success: true,
+      data: tables,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

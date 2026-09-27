@@ -28,10 +28,21 @@ enum TableStatus {
 }
 
 enum PaymentStatus {
+  CREATED
   PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum BillPaymentStatus {
+  UNPAID
   PAID
   FAILED
   REFUNDED
+  CANCELLED
 }
 
 enum PaymentMethod {
@@ -41,32 +52,153 @@ enum PaymentMethod {
   ONLINE
 }
 
+enum ExpenseCategory {
+  RENT
+  SALARY
+  ELECTRICITY
+  GAS
+  WATER
+  INTERNET
+  PACKAGING
+  DELIVERY
+  MARKETING
+  MAINTENANCE
+  SUPPLIES
+  OTHER
+}
+
+enum ExpensePaymentMethod {
+  CASH
+  UPI
+  CARD
+  BANK_TRANSFER
+  OTHER
+}
+
+enum IngredientUnit {
+  GRAM
+  KILOGRAM
+  MILLILITER
+  LITER
+  PIECE
+  PACK
+  BOTTLE
+  BOX
+  OTHER
+}
+
+enum IngredientCategory {
+  VEGETABLE
+  FRUIT
+  GRAIN
+  DAIRY
+  MEAT
+  SEAFOOD
+  SPICE
+  OIL
+  BEVERAGE
+  PACKAGING
+  OTHER
+}
+
+enum StockMovementType {
+  PURCHASE
+  ORDER_CONSUMPTION
+  WASTAGE
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  RETURN
+  INITIAL_STOCK
+}
+
+enum WastageReason {
+  SPOILAGE
+  KITCHEN_ERROR
+  DAMAGED
+  EXPIRED
+  OVERPRODUCTION
+  OTHER
+}
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  CASHIER
+  KITCHEN
+  WAITER
+}
+
+enum AuditAction {
+  STAFF_CREATED
+  STAFF_UPDATED
+  STAFF_ROLE_CHANGED
+  STAFF_ACTIVATED
+  STAFF_DEACTIVATED
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  ORDER_CANCELLED
+  BILL_CREATED
+  PAYMENT_CREATED
+  PAYMENT_CUSTOMER_REPORTED
+  PAYMENT_VERIFIED
+  PAYMENT_REJECTED
+  EXPENSE_CREATED
+  EXPENSE_UPDATED
+  EXPENSE_DELETED
+  INGREDIENT_CREATED
+  INGREDIENT_UPDATED
+  PURCHASE_CREATED
+  STOCK_ADJUSTED
+  WASTAGE_RECORDED
+  INVENTORY_CONSUMED
+  MENU_ITEM_CREATED
+  MENU_ITEM_UPDATED
+  MENU_ITEM_DEACTIVATED
+  RECIPE_CREATED
+  RECIPE_UPDATED
+  RESTAURANT_SETTINGS_UPDATED
+}
+
 model Restaurant {
-  id              String       @id @default(uuid())
-  slug            String       @unique
-  name            String
-  tagline         String?
-  logoUrl         String?
-  coverImageUrl   String?
-  phone           String?
-  email           String?
-  address         String?
-  currency        String       @default("USD")
-  currencySymbol  String       @default("$")
-  taxRate         Float        @default(0.08) // 8% default
-  serviceFeeRate  Float        @default(0.00)
-  themePreset     String       @default("VEG_THEME") // "VEG_THEME" | "NON_VEG_THEME" | "CUSTOM"
-  themeConfigJson Json?        // Stored ThemeConfiguration
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id                        String       @id @default(uuid())
+  slug                      String       @unique
+  name                      String
+  tagline                   String?
+  logoUrl                   String?
+  coverImageUrl             String?
+  phone                     String?
+  email                     String?
+  address                   String?
+  currency                  String       @default("INR")
+  currencySymbol            String       @default("₹")
+  taxRate                   Float        @default(0.05) // 5% GST default
+  serviceFeeRate            Float        @default(0.00)
+  themePreset               String       @default("VEG_THEME") // "VEG_THEME" | "NON_VEG_THEME" | "CUSTOM"
+  themeConfigJson           Json?        // Stored ThemeConfiguration
+  inventoryTrackingEnabled  Boolean      @default(true)
+  stockEnforcementEnabled   Boolean      @default(false)
+  isActive                  Boolean      @default(true)
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
 
   // Relationships
-  tables          Table[]
-  categories      Category[]
-  menuItems       MenuItem[]
-  orders          Order[]
-  customers       Customer[]
+  tables                    Table[]
+  categories                Category[]
+  menuItems                 MenuItem[]
+  orders                    Order[]
+  customers                 Customer[]
+  bills                     Bill[]
+  payments                  Payment[]
+  expenses                  Expense[]
+  ingredients               Ingredient[]
+  recipes                   Recipe[]
+  suppliers                 Supplier[]
+  purchases                 Purchase[]
+  stockMovements            StockMovement[]
+  wastageRecords            WastageRecord[]
 
   @@map("restaurants")
 }
@@ -86,6 +218,7 @@ model Table {
   // Relationships
   restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders          Order[]
+  bills           Bill[]
 
   @@unique([restaurantId, tableNumber])
   @@map("tables")
@@ -103,6 +236,7 @@ model Customer {
   // Relationships
   restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders          Order[]
+  bills           Bill[]
 
   @@index([restaurantId, mobileNumber])
   @@map("customers")
@@ -186,6 +320,8 @@ model Order {
   table               Table        @relation(fields: [tableId], references: [id], onDelete: Restrict)
   customer            Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
   items               OrderItem[]
+  bill                Bill?
+  payments            Payment[]
 
   @@index([restaurantId, status])
   @@index([restaurantId, tableId])
@@ -210,3 +346,248 @@ model OrderItem {
 
   @@map("order_items")
 }
+
+model Bill {
+  id             String            @id @default(uuid())
+  billNumber     String            @unique // e.g. "BILL-20260927-1048"
+  restaurantId   String
+  orderId        String            @unique
+  tableId        String
+  customerId     String
+  subtotal       Float
+  taxAmount      Float
+  serviceCharge  Float             @default(0.0)
+  discountAmount Float             @default(0.0)
+  totalAmount    Float
+  currency       String            @default("INR")
+  paymentStatus  BillPaymentStatus @default(UNPAID)
+  generatedAt    DateTime          @default(now())
+  paidAt         DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  // Relationships
+  restaurant     Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  order          Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  table          Table             @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  customer       Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  payments       Payment[]
+
+  @@index([restaurantId, paymentStatus])
+  @@map("bills")
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  restaurantId      String
+  billId            String
+  orderId           String
+  provider          String        // e.g. "RAZORPAY", "STRIPE", "MOCK_DEV"
+  providerOrderId   String?       // Gateway order ID (e.g. order_ABC123)
+  providerPaymentId String?       @unique // Gateway payment ID (e.g. pay_XYZ789)
+  amount            Float
+  currency          String        @default("INR")
+  status            PaymentStatus @default(CREATED)
+  failureReason     String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  paidAt            DateTime?
+
+  // Relationships
+  restaurant        Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  bill              Bill          @relation(fields: [billId], references: [id], onDelete: Cascade)
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status])
+  @@index([providerOrderId])
+  @@map("payments")
+}
+
+model Expense {
+  id            String               @id @default(uuid())
+  restaurantId  String
+  category      ExpenseCategory
+  description   String
+  amount        Float
+  expenseDate   DateTime             @default(now())
+  paymentMethod ExpensePaymentMethod @default(CASH)
+  notes         String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  // Relationships
+  restaurant    Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, expenseDate])
+  @@index([restaurantId, category])
+  @@map("expenses")
+}
+
+model Ingredient {
+  id                  String             @id @default(uuid())
+  restaurantId        String
+  name                String
+  sku                 String?
+  unit                IngredientUnit     @default(KILOGRAM)
+  category            IngredientCategory @default(VEGETABLE)
+  currentStock        Float              @default(0.0)
+  minimumStock        Float              @default(0.0)
+  reorderLevel        Float              @default(5.0)
+  costPerUnit         Float              @default(0.0) // Current unit cost
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relationships
+  restaurant          Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  recipeIngredients   RecipeIngredient[]
+  stockMovements      StockMovement[]
+  purchaseItems       PurchaseItem[]
+  wastageRecords      WastageRecord[]
+
+  @@index([restaurantId, isActive])
+  @@index([restaurantId, category])
+  @@map("ingredients")
+}
+
+model Recipe {
+  id                  String             @id @default(uuid())
+  restaurantId        String
+  menuItemId          String             @unique // One active recipe per menuItem
+  name                String
+  yieldQuantity       Float              @default(1.0)
+  yieldUnit           String             @default("PORTION")
+  instructions        String?
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relationships
+  restaurant          Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ingredients         RecipeIngredient[]
+
+  @@index([restaurantId])
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id                  String             @id @default(uuid())
+  recipeId            String
+  ingredientId        String
+  quantity            Float              // e.g. 0.25 (KG) or 20 (GRAM)
+  unit                IngredientUnit
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relationships
+  recipe              Recipe             @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient          Ingredient         @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@unique([recipeId, ingredientId])
+  @@map("recipe_ingredients")
+}
+
+model Supplier {
+  id                  String             @id @default(uuid())
+  restaurantId        String
+  name                String
+  phone               String?
+  email               String?
+  address             String?
+  gstNumber           String?
+  notes               String?
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relationships
+  restaurant          Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  purchases           Purchase[]
+
+  @@index([restaurantId, isActive])
+  @@map("suppliers")
+}
+
+model Purchase {
+  id                  String             @id @default(uuid())
+  restaurantId        String
+  supplierId          String?
+  invoiceNumber       String?
+  purchaseDate        DateTime           @default(now())
+  totalAmount         Float              @default(0.0)
+  notes               String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relationships
+  restaurant          Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier            Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  items               PurchaseItem[]
+
+  @@index([restaurantId, purchaseDate])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id                  String             @id @default(uuid())
+  purchaseId          String
+  ingredientId        String
+  quantity            Float
+  unit                IngredientUnit
+  unitCost            Float
+  totalCost           Float
+
+  // Relationships
+  purchase            Purchase           @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  ingredient          Ingredient         @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@map("purchase_items")
+}
+
+model StockMovement {
+  id                  String             @id @default(uuid())
+  restaurantId        String
+  ingredientId        String
+  movementType        StockMovementType
+  quantity            Float              // Positive for in, negative for out
+  unit                IngredientUnit
+  unitCost            Float              @default(0.0)
+  totalCost           Float              @default(0.0)
+  referenceType       String?            // "ORDER", "PURCHASE", "WASTAGE", "MANUAL_ADJUSTMENT"
+  referenceId         String?            // e.g. orderId, purchaseId, wastageId
+  notes               String?
+  movementDate        DateTime           @default(now())
+  createdAt           DateTime           @default(now())
+
+  // Relationships
+  restaurant          Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ingredient          Ingredient         @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@index([restaurantId, ingredientId])
+  @@index([restaurantId, movementDate])
+  @@index([restaurantId, referenceType, referenceId])
+  @@map("stock_movements")
+}
+
+model WastageRecord {
+  id                  String             @id @default(uuid())
+  restaurantId        String
+  ingredientId        String
+  quantity            Float
+  unit                IngredientUnit
+  costPerUnit         Float              @default(0.0)
+  totalCost           Float              @default(0.0)
+  reason              WastageReason      @default(SPOILAGE)
+  notes               String?
+  wastageDate         DateTime           @default(now())
+  createdAt           DateTime           @default(now())
+
+  // Relationships
+  restaurant          Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ingredient          Ingredient         @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@index([restaurantId, wastageDate])
+  @@map("wastage_records")
+}
+
+

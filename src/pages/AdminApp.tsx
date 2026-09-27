@@ -2,12 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { AdminLayout, AdminTab } from '../components/admin/AdminLayout.js';
 import { DashboardOverview } from '../components/admin/DashboardOverview.js';
 import { OrdersKanban } from '../components/admin/OrdersKanban.js';
+import { BillingView } from '../components/admin/BillingView.js';
 import { TablesGrid } from '../components/admin/TablesGrid.js';
 import { MenuEditor } from '../components/admin/MenuEditor.js';
 import { CategoriesEditor } from '../components/admin/CategoriesEditor.js';
+import { FinancialAnalyticsView } from '../components/admin/FinancialAnalyticsView.js';
+import { ExpensesView } from '../components/admin/ExpensesView.js';
+import { BusinessIntelligenceView } from '../components/admin/BusinessIntelligenceView.js';
+import { ReportsView } from '../components/admin/ReportsView.js';
+import { InventoryView } from '../components/admin/InventoryView.js';
+import { StaffManagementView } from '../components/admin/StaffManagementView.js';
 import { FutureModulePlaceholder } from '../components/admin/FutureModulePlaceholder.js';
-import { Category, MenuItem, Order, OrderStatus, Restaurant, Table } from '../types/index.js';
+import { Category, CurrentUserResponse, MenuItem, Order, OrderStatus, Restaurant, StaffUser, Table } from '../types/index.js';
 import { api } from '../services/api.js';
+import { hasAnyPermission } from '../utils/rbac.js';
 
 interface AdminAppProps {
   onOpenCustomerView: (slug: string, tableId: string) => void;
@@ -17,6 +25,9 @@ export const AdminApp: React.FC<AdminAppProps> = ({ onOpenCustomerView }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [activeRestaurant, setActiveRestaurant] = useState<Restaurant | null>(null);
+
+  const [currentStaff, setCurrentStaff] = useState<CurrentUserResponse | null>(null);
+  const [staffList, setStaffList] = useState<StaffUser[]>([]);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
@@ -35,24 +46,108 @@ export const AdminApp: React.FC<AdminAppProps> = ({ onOpenCustomerView }) => {
     });
   }, []);
 
+  // Initialize staff session when active restaurant changes
+  useEffect(() => {
+    if (!activeRestaurant) return;
+
+    const initStaffSession = async () => {
+      try {
+        // Authenticate as owner of active restaurant by default
+        const email = activeRestaurant.slug.includes('verde')
+          ? 'owner@verde.com'
+          : 'owner@ember.com';
+
+        const authRes = await api.loginStaff(email, 'Password@123', activeRestaurant.id);
+        const meRes = await api.getAdminMe();
+        setCurrentStaff(meRes);
+
+        const list = await api.getAdminStaff(activeRestaurant.id);
+        setStaffList(list);
+      } catch (err) {
+        console.error('Error initializing staff session:', err);
+      }
+    };
+
+    initStaffSession();
+  }, [activeRestaurant?.id]);
+
+  // Switch between staff members in UI to test RBAC roles live
+  const handleSwitchStaff = async (staffId: string) => {
+    if (!activeRestaurant) return;
+    try {
+      const targetStaff = staffList.find((s) => s.id === staffId);
+      if (!targetStaff) return;
+
+      // Log in as target staff
+      const authRes = await api.loginStaff(targetStaff.email, 'Password@123', activeRestaurant.id);
+      const meRes = await api.getAdminMe();
+      setCurrentStaff(meRes);
+
+      // Check if current tab is accessible by new role
+      const role = meRes.role;
+      const roleAccess: Record<AdminTab, boolean> = {
+        dashboard: hasAnyPermission(role, ['ORDER_VIEW', 'FINANCIAL_VIEW', 'STAFF_VIEW', 'KDS_VIEW']),
+        orders: hasAnyPermission(role, ['ORDER_VIEW', 'KDS_VIEW']),
+        billing: hasAnyPermission(role, ['BILLING_VIEW', 'PAYMENT_VIEW']),
+        tables: hasAnyPermission(role, ['TABLE_VIEW', 'TABLE_MANAGE']),
+        inventory: hasAnyPermission(role, ['INVENTORY_VIEW', 'RECIPE_VIEW', 'INVENTORY_MANAGE']),
+        bi: hasAnyPermission(role, ['FINANCIAL_VIEW']),
+        analytics: hasAnyPermission(role, ['FINANCIAL_VIEW']),
+        expenses: hasAnyPermission(role, ['EXPENSE_VIEW', 'EXPENSE_MANAGE']),
+        reports: hasAnyPermission(role, ['REPORT_VIEW']),
+        menu: hasAnyPermission(role, ['MENU_VIEW', 'MENU_MANAGE']),
+        categories: hasAnyPermission(role, ['CATEGORY_MANAGE', 'MENU_MANAGE']),
+        staff: hasAnyPermission(role, ['STAFF_VIEW', 'STAFF_MANAGE']),
+        customers: role === 'OWNER',
+        payments: role === 'OWNER',
+        settings: role === 'OWNER',
+      };
+
+      if (!roleAccess[activeTab]) {
+        // Fall back to first accessible tab
+        if (role === 'KITCHEN') {
+          setActiveTab('orders');
+        } else if (role === 'WAITER') {
+          setActiveTab('tables');
+        } else if (role === 'CASHIER') {
+          setActiveTab('billing');
+        } else {
+          setActiveTab('dashboard');
+        }
+      }
+
+      refreshData();
+    } catch (err: any) {
+      alert(`Error switching staff: ${err.message}`);
+    }
+  };
+
   // Refresh active restaurant data
   const refreshData = async () => {
     if (!activeRestaurant) return;
     setLoading(true);
     try {
       const [overviewData, ordersData, tablesData, menuData, categoriesData] = await Promise.all([
-        api.getAdminOverview(activeRestaurant.id),
-        api.getAdminOrders(activeRestaurant.id),
-        api.getAdminTables(activeRestaurant.id),
-        api.getMenuItems(activeRestaurant.slug),
-        api.getCategories(activeRestaurant.slug),
+        api.getAdminOverview(activeRestaurant.id).catch(() => ({ metrics: null, recentOrders: [] })),
+        api.getAdminOrders(activeRestaurant.id).catch(() => []),
+        api.getAdminTables(activeRestaurant.id).catch(() => []),
+        api.getMenuItems(activeRestaurant.slug).catch(() => []),
+        api.getCategories(activeRestaurant.slug).catch(() => []),
       ]);
 
-      setOverviewMetrics(overviewData.metrics);
-      setOrders(ordersData);
-      setTables(tablesData);
-      setMenuItems(menuData);
-      setCategories(categoriesData);
+      if (overviewData?.metrics) {
+        setOverviewMetrics(overviewData.metrics);
+      }
+      setOrders(ordersData || []);
+      setTables(tablesData || []);
+      setMenuItems(menuData || []);
+      setCategories(categoriesData || []);
+
+      // Also refresh staff list if user has staff view
+      if (currentStaff?.role === 'OWNER' || currentStaff?.role === 'MANAGER') {
+        const staffData = await api.getAdminStaff(activeRestaurant.id).catch(() => []);
+        setStaffList(staffData);
+      }
     } catch (err) {
       console.error('Error refreshing admin data', err);
     } finally {
@@ -62,7 +157,7 @@ export const AdminApp: React.FC<AdminAppProps> = ({ onOpenCustomerView }) => {
 
   useEffect(() => {
     refreshData();
-  }, [activeRestaurant?.id]);
+  }, [activeRestaurant?.id, currentStaff?.id]);
 
   const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus, reason?: string) => {
     try {
@@ -117,6 +212,14 @@ export const AdminApp: React.FC<AdminAppProps> = ({ onOpenCustomerView }) => {
       restaurant={activeRestaurant}
       restaurants={restaurants}
       onSelectRestaurant={(r) => setActiveRestaurant(r)}
+      currentStaff={currentStaff}
+      staffList={staffList}
+      onSwitchStaff={handleSwitchStaff}
+      onLogout={async () => {
+        await api.logoutStaff();
+        // re-login as owner for demo
+        handleSwitchStaff(staffList[0]?.id);
+      }}
     >
       {activeTab === 'dashboard' && overviewMetrics && (
         <DashboardOverview
@@ -136,6 +239,35 @@ export const AdminApp: React.FC<AdminAppProps> = ({ onOpenCustomerView }) => {
           onRefresh={refreshData}
           loading={loading}
         />
+      )}
+
+      {activeTab === 'billing' && (
+        <BillingView
+          restaurant={activeRestaurant}
+          onOpenCustomerBill={(slug, billNumber) => {
+            window.open(`/restaurant/${slug}/bill/${billNumber}`, '_blank');
+          }}
+        />
+      )}
+
+      {activeTab === 'inventory' && (
+        <InventoryView restaurant={activeRestaurant} />
+      )}
+
+      {activeTab === 'bi' && (
+        <BusinessIntelligenceView restaurant={activeRestaurant} />
+      )}
+
+      {activeTab === 'analytics' && (
+        <FinancialAnalyticsView restaurant={activeRestaurant} />
+      )}
+
+      {activeTab === 'expenses' && (
+        <ExpensesView restaurant={activeRestaurant} />
+      )}
+
+      {activeTab === 'reports' && (
+        <ReportsView restaurant={activeRestaurant} />
       )}
 
       {activeTab === 'tables' && (
@@ -166,12 +298,16 @@ export const AdminApp: React.FC<AdminAppProps> = ({ onOpenCustomerView }) => {
         />
       )}
 
+      {activeTab === 'staff' && (
+        <StaffManagementView
+          restaurant={activeRestaurant}
+          currentUser={currentStaff}
+        />
+      )}
+
       {[
         'customers',
-        'billing',
         'payments',
-        'analytics',
-        'reports',
         'settings',
       ].includes(activeTab) && (
         <FutureModulePlaceholder

@@ -29,23 +29,27 @@ import { FoodDetailModal } from '../components/customer/FoodDetailModal.js';
 import { CartDrawer } from '../components/customer/CartDrawer.js';
 import { OrderConfirmation } from '../components/customer/OrderConfirmation.js';
 import { OrderStatusView } from '../components/customer/OrderStatusView.js';
+import { DigitalBillView } from '../components/customer/DigitalBillView.js';
 
 type CustomerStep =
   | 'customer_form'
   | 'welcome'
   | 'menu'
   | 'order_confirmation'
-  | 'order_status';
+  | 'order_status'
+  | 'bill';
 
 interface CustomerAppProps {
   restaurantSlug: string;
   tableId: string;
+  initialBillNumber?: string;
   onSwitchToAdmin?: () => void;
 }
 
 export const CustomerApp: React.FC<CustomerAppProps> = ({
   restaurantSlug,
   tableId,
+  initialBillNumber,
   onSwitchToAdmin,
 }) => {
   const {
@@ -68,13 +72,14 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
     setSelectedFoodDetail,
   } = useCart();
 
-  const [step, setStep] = useState<CustomerStep>('customer_form');
+  const [step, setStep] = useState<CustomerStep>(initialBillNumber ? 'bill' : 'customer_form');
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [vegFilter, setVegFilter] = useState<boolean | null>(null);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
+  const [currentBillNumber, setCurrentBillNumber] = useState<string | undefined>(initialBillNumber);
 
   // Load table session on mount or slug change
   useEffect(() => {
@@ -83,14 +88,16 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
 
   // Adjust step based on session state once loaded
   useEffect(() => {
-    if (activeOrderNumber) {
+    if (initialBillNumber) {
+      setStep('bill');
+    } else if (activeOrderNumber) {
       setStep('order_status');
     } else if (customer) {
       setStep('welcome');
     } else {
       setStep('customer_form');
     }
-  }, [customer?.id, activeOrderNumber]);
+  }, [customer?.id, activeOrderNumber, initialBillNumber]);
 
   // Load menu items & categories when restaurant is loaded
   useEffect(() => {
@@ -192,6 +199,28 @@ export const CustomerApp: React.FC<CustomerAppProps> = ({
       {step === 'order_status' && (
         <OrderStatusView
           orderNumber={activeOrderNumber || placedOrder?.orderNumber || 'ORD-20260927-1000'}
+          onBackToMenu={() => setStep('menu')}
+          onViewDigitalBill={(ordNum) => {
+            // Push browser history for seamless sharing / bookmarking
+            api.generateBill(restaurantSlug, ordNum)
+              .then((generatedBill) => {
+                setCurrentBillNumber(generatedBill.billNumber);
+                setStep('bill');
+                window.history.pushState({}, '', `/restaurant/${restaurantSlug}/bill/${generatedBill.billNumber}`);
+              })
+              .catch((err) => {
+                alert(err.message || 'Could not generate digital bill');
+              });
+          }}
+        />
+      )}
+
+      {step === 'bill' && (
+        <DigitalBillView
+          restaurantSlug={restaurantSlug}
+          billNumber={currentBillNumber}
+          orderNumber={activeOrderNumber || placedOrder?.orderNumber}
+          onBackToOrderStatus={() => setStep('order_status')}
           onBackToMenu={() => setStep('menu')}
         />
       )}
