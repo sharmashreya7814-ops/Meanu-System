@@ -1,0 +1,7 @@
+{
+  "name": "QR Restaurant Ordering System",
+  "description": "Production-ready QR-based restaurant food ordering web platform with customizable themes, live table management, and kitchen order dispatch.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

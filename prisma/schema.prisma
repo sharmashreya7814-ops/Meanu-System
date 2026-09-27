@@ -1,0 +1,212 @@
+// Prisma Schema for QR-Based Restaurant Ordering System
+// Target Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  NEW
+  ACCEPTED
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  ONLINE
+}
+
+model Restaurant {
+  id              String       @id @default(uuid())
+  slug            String       @unique
+  name            String
+  tagline         String?
+  logoUrl         String?
+  coverImageUrl   String?
+  phone           String?
+  email           String?
+  address         String?
+  currency        String       @default("USD")
+  currencySymbol  String       @default("$")
+  taxRate         Float        @default(0.08) // 8% default
+  serviceFeeRate  Float        @default(0.00)
+  themePreset     String       @default("VEG_THEME") // "VEG_THEME" | "NON_VEG_THEME" | "CUSTOM"
+  themeConfigJson Json?        // Stored ThemeConfiguration
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relationships
+  tables          Table[]
+  categories      Category[]
+  menuItems       MenuItem[]
+  orders          Order[]
+  customers       Customer[]
+
+  @@map("restaurants")
+}
+
+model Table {
+  id              String       @id @default(uuid())
+  restaurantId    String
+  tableNumber     String
+  tableName       String?      // e.g. "Patio 4", "Booth 2"
+  capacity        Int          @default(4)
+  qrCodeUrl       String?      // Generated deep-link or storage URL
+  status          TableStatus  @default(AVAILABLE)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relationships
+  restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders          Order[]
+
+  @@unique([restaurantId, tableNumber])
+  @@map("tables")
+}
+
+model Customer {
+  id              String       @id @default(uuid())
+  restaurantId    String
+  name            String
+  mobileNumber    String
+  lastActiveAt    DateTime     @default(now())
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relationships
+  restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders          Order[]
+
+  @@index([restaurantId, mobileNumber])
+  @@map("customers")
+}
+
+model Category {
+  id              String       @id @default(uuid())
+  restaurantId    String
+  name            String
+  slug            String
+  description     String?
+  icon            String?
+  sortOrder       Int          @default(0)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relationships
+  restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItems       MenuItem[]
+
+  @@unique([restaurantId, slug])
+  @@map("categories")
+}
+
+model MenuItem {
+  id                 String       @id @default(uuid())
+  restaurantId       String
+  categoryId         String
+  name               String
+  description        String
+  image              String
+  price              Float        // Selling price
+  costPrice          Float?       // Cost of goods sold for profit/loss reporting
+  isVeg              Boolean      @default(true)
+  isAvailable        Boolean      @default(true)
+  isFeatured         Boolean      @default(false)
+  spicyLevel         Int          @default(0) // 0-3
+  preparationTimeMin Int          @default(15) // In minutes
+  calories           Int?
+  allergens          String[]     @default([])
+  sortOrder          Int          @default(0)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  // Relationships
+  restaurant         Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category           Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderItems         OrderItem[]
+
+  @@index([restaurantId, categoryId])
+  @@map("menu_items")
+}
+
+model Order {
+  id                  String       @id @default(uuid())
+  orderNumber         String       @unique // Human readable: e.g. "ORD-1049"
+  restaurantId        String
+  tableId             String
+  customerId          String
+  status              OrderStatus  @default(NEW)
+  paymentStatus       PaymentStatus @default(PENDING)
+  paymentMethod       PaymentMethod?
+  subtotal            Float
+  taxAmount           Float
+  discountAmount      Float        @default(0.0)
+  totalAmount         Float
+  specialInstructions String?
+  estimatedMinutes    Int          @default(20)
+  acceptedAt          DateTime?
+  preparedAt          DateTime?
+  servedAt            DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relationships
+  restaurant          Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table               Table        @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  customer            Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items               OrderItem[]
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, tableId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String       @id @default(uuid())
+  orderId             String
+  menuItemId          String
+  name                String       // Snapshot of menu item name at order time
+  price               Float        // Snapshot of unit price at order time (backend enforced)
+  costPrice           Float?       // Snapshot of cost price for profit analytics
+  quantity            Int
+  specialInstructions String?
+  itemTotal           Float        // price * quantity
+  createdAt           DateTime     @default(now())
+
+  // Relationships
+  order               Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem            MenuItem     @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@map("order_items")
+}
